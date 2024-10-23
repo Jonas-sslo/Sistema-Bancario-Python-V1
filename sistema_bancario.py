@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 saldo = 100
@@ -5,6 +6,86 @@ saques = []
 depositos = []
 limite_transacoes = []
 horarios_transacoes = []
+usuarios = []
+
+
+def validar_data(nascimento):
+    try:
+        data_nascimento = datetime.strptime(nascimento, "%d/%m/%Y")
+        return data_nascimento
+    except ValueError:
+        print("\nA data de nascimento informada não está seguindo os padrões.")
+        return None
+
+
+def validar_endereco(endereco):
+    partes = [parte.strip() for parte in endereco.split("-")]
+
+    if len(partes) != 5:
+        print("\nO formato inserido não corresponde ao informado.")
+        return None
+    elif (
+        not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[0])
+        and (not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[2]))
+        and (not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[3]))
+    ):
+        print("\nApenas são permitidos letras nesse campo.")
+        return None
+    elif not partes[1].isdigit() or (int(partes[1]) <= 0):
+        print("\nApenas são permitidos números nesse campo.")
+        return None
+    elif not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[4]) and (partes[4] != 2):
+        print("\nO formato inserido não corresponde ao informado.")
+        return None
+
+    endereco = {
+        "logradouro": partes[0],
+        "numero": partes[1],
+        "bairro": partes[2],
+        "cidade": partes[3],
+        "uf": partes[4],
+    }
+
+    return endereco
+
+
+def cadastrar_usuario(nome, nascimento, cpf, endereco):
+    cpf = re.sub(r"\D", "", cpf)
+    data_nascimento = validar_data(nascimento)
+    endereco_verificado = validar_endereco(endereco)
+
+    # Validação do nome
+    if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", nome) or (len(nome) > 30):
+        print("\nEsse não é um nome válido.")
+        return
+    # Validação do CPF
+    elif len(cpf) != 11:
+        print("\nCPF inválido!")
+        return
+    # Validação da data de nascimento
+    elif data_nascimento is None:
+        return
+    # Validação do endereço
+    elif endereco_verificado is None:
+        return
+
+    # Validação de CPF duplicado
+    for usuario in usuarios:
+        if cpf in usuario:
+            print("\nUm usuário com esse cpf já está cadastrado.")
+            return
+
+    usuarios.append(
+        {
+            cpf: {
+                "nome": nome,
+                "nascimento": data_nascimento.strftime("%d/%m/%Y"),
+                "endereco": endereco_verificado,
+            }
+        }
+    )
+    print(f"\nO usuário {nome} foi cadastrado com sucesso.")
+    return usuarios
 
 
 def atualizar_limite_transacoes():
@@ -52,7 +133,7 @@ def sacar(saldo, limite_transacoes, horarios_transacoes, valor):
     return saldo, limite_transacoes, horarios_transacoes
 
 
-def extrato(depositos, saques, horario_transacoes, saldo):
+def extrato(depositos, saques, saldo):
     if not depositos and not saques:
         print("\nSeu extrato está vazio!")
     else:
@@ -78,25 +159,37 @@ def extrato(depositos, saques, horario_transacoes, saldo):
 while True:
     print(
         """\n========== MENU ==========
-[1] - Realizar Deposito
-[2] - Realizar Saque
-[3] - Visualizar Extrato
+[1] - Cadastrar Usuário
+[2] - Criar Conta Corrente
+[3] - Realizar Deposito
+[4] - Realizar Saque
+[5] - Visualizar Extrato
 [0] - Sair
 =========================="""
     )
     opcao = int(input("Escolha uma opção: "))
     if opcao == 1:
+        nomeUsuario = input("\nInsira o nome do usuário: ")
+        nascimentoUsuario = input("Insira a sua data de nascimento (%d/%m/%Y): ")
+        cpfUsuario = input("Insira o seu cpf (apenas os digítos): ")
+        enderecoUsuario = input(
+            "Insira o seu endereco (logradouro-número-bairro-cidade-UF:): "
+        )
+        cadastrar_usuario(nomeUsuario, nascimentoUsuario, cpfUsuario, enderecoUsuario)
+    elif opcao == 2:
+        break
+    elif opcao == 3:
         valorDeposito = float(input("\nInsira o valor a ser depositado: "))
         saldo, limite_transacoes, horarios_transacoes = depositar(
             saldo, limite_transacoes, horarios_transacoes, valorDeposito
         )
-    elif opcao == 2:
+    elif opcao == 4:
         valorSaque = float(input("\nInsira o valor a ser sacado: "))
         saldo, limite_transacoes, horarios_transacoes = sacar(
             saldo, limite_transacoes, horarios_transacoes, valorSaque
         )
-    elif opcao == 3:
-        extrato(depositos, saques, horarios_transacoes, saldo)
+    elif opcao == 5:
+        extrato(depositos, saques, saldo)
     elif opcao == 0:
         print("Operação encerrada! Saindo do programa...")
         break
