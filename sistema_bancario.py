@@ -1,11 +1,6 @@
 import re
 from datetime import datetime
 
-saldo = 100
-saques = []
-depositos = []
-limite_transacoes = []
-horarios_transacoes = []
 usuarios = []
 numero_conta = 1
 
@@ -28,7 +23,7 @@ def validar_endereco(endereco):
         print("\nO formato inserido não corresponde ao informado.")
         return None
     elif (
-    # Verificação para permitir apenas letras
+        # Verificação para permitir apenas letras
         not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[0])
         and (not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[2]))
         and (not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", partes[3]))
@@ -49,14 +44,14 @@ def validar_endereco(endereco):
         "numero": partes[1],
         "bairro": partes[2],
         "cidade": partes[3],
-        "uf": partes[4],
+        "uf": partes[4].upper(),
     }
 
     return endereco
 
 
 def cadastrar_usuario(nome, nascimento, cpf, endereco):
-    cpf = re.sub(r"\D", "", cpf) # Permite apenas números
+    cpf = re.sub(r"\D", "", cpf)  # Permite apenas números
     data_nascimento = validar_data(nascimento)
     endereco_verificado = validar_endereco(endereco)
 
@@ -92,7 +87,6 @@ def cadastrar_usuario(nome, nascimento, cpf, endereco):
         }
     )
     print(f"\nO usuário {nome} foi cadastrado com sucesso.")
-    return usuarios
 
 
 def criar_conta_corrente(cpf_usuario, numero_conta):
@@ -102,80 +96,112 @@ def criar_conta_corrente(cpf_usuario, numero_conta):
             conta = {
                 "Agência": "0001",
                 "Número da Conta": numero_conta,
+                "Saldo": 100,
+                "Saques": [],
+                "Depósitos": [],
+                "Horário de Transações": [],
+                "Limite de Transações": 0,
             }
             usuario[cpf_usuario]["contas"].append(conta)
             print(f"\nConta criada com sucesso! Número da conta: {numero_conta}")
+            print(usuario[cpf_usuario])
             return numero_conta + 1
     print("\nUsuário não encontrado!")
     return numero_conta
 
 
-def atualizar_limite_transacoes():
-    return len(depositos) + len(saques)
+def atualizar_limite_transacoes(conta):
+    return len(conta["Depósitos"]) + len(conta["Saques"])
 
 
 def define_horario_transacoes():
     return datetime.now()
 
 
-def depositar(saldo, limite_transacoes, horarios_transacoes, valor):
+def verificar_conta(cpf_usuario, numero_conta):
+    for usuario in usuarios:
+        if cpf_usuario in usuario:
+            contas = usuario[cpf_usuario]["contas"]
+            for conta in contas:
+                if conta["Número da Conta"] == int(numero_conta):
+                    return conta  # Retorna a conta com o número correspondente
+    return None
+
+
+def depositar(cpf_usuario, numero_conta, valor):
+    conta = verificar_conta(cpf_usuario, numero_conta) # Verificação da Conta
+
+    if conta is None:
+        print("\nConta não encontrada!")
+        return
+
     if valor <= 0:
         print("\nOperação cancelada! Não foi possível depositar a quantia informada.")
-    elif atualizar_limite_transacoes() >= 10:
+    elif atualizar_limite_transacoes(conta) >= 10:
         print("\nSeu limite de saques e depósitos diários foi atingido!")
     else:
-        saldo += valor
-        depositos.append(valor)
-        horarios_transacoes.append(define_horario_transacoes())
-        limite_transacoes = atualizar_limite_transacoes()
+        conta["Saldo"] += valor
+        conta["Depósitos"].append(valor)
+        conta["Horário de Transações"].append(define_horario_transacoes())
+        conta["Limite de Transações"] = atualizar_limite_transacoes(conta)
         print(
-            f"\nForam inseridos R${valor:.2f} na sua conta \n\nSaldo atual: R${saldo:.2f} \n \nForam realizadas {limite_transacoes} transações até agora!"
+            f"\nForam inseridos R${valor:.2f} na sua conta \n\nSaldo atual: R${conta['Saldo']:.2f} \n \nForam realizadas {conta['Limite de Transações']} transações até agora!"
         )
-    return saldo, limite_transacoes, horarios_transacoes
 
 
-def sacar(saldo, limite_transacoes, horarios_transacoes, valor):
+def sacar(cpf_usuario, numero_conta, valor):
+    conta = verificar_conta(cpf_usuario, numero_conta) # Verificação da Conta
+
+    if conta is None:
+        print("\nConta não encontrada!")
+        return
+
     if valor <= 0:
         print("\nOperação cancelada! Não foi possível sacar a quantia informada.")
-    elif atualizar_limite_transacoes() >= 10:
+    elif atualizar_limite_transacoes(conta) >= 10:
         print("\nSeu limite de saques e depósitos diários foi atingido!")
-    elif saldo < valor:
+    elif conta["Saldo"] < valor:
         print("\nOperação cancelada! Você não possui saldo!")
     else:
         if valor <= 500:
-            saldo -= valor
-            saques.append(valor)
-            horarios_transacoes.append(define_horario_transacoes())
-            limite_transacoes = atualizar_limite_transacoes()
+            conta["Saldo"] -= valor
+            conta["Saques"].append(valor)
+            conta["Horário de Transações"].append(define_horario_transacoes())
+            conta["Limite de Transações"] = atualizar_limite_transacoes(conta)
             print(
-                f"\nForam sacados R${valor:.2f} da sua conta \n\nSaldo atual: R${saldo:.2f} \n \nForam realizadas {limite_transacoes} transações até agora!"
+                f"\nForam sacados R${valor:.2f} da sua conta \n\nSaldo atual: R${conta['Saldo']:.2f} \n \nForam realizadas {conta['Limite de Transações']} transações até agora!"
             )
         else:
             print("\nOperação cancelada! O seu limite de saque é de R$500,00")
-    return saldo, limite_transacoes, horarios_transacoes
 
 
-def extrato(depositos, saques, saldo):
-    if not depositos and not saques:
+def extrato(cpf_usuario, numero_conta):
+    conta = verificar_conta(cpf_usuario, numero_conta) # Verificação da Conta
+
+    if conta is None:
+        print("\nConta não encontrada!")
+        return
+
+    if not conta["Depósitos"] and not conta["Saques"]:
         print("\nSeu extrato está vazio!")
     else:
-        if depositos:
+        if conta["Depósitos"]:
             print("\nSeus depósitos:")
-            for i, deposito in enumerate(depositos):
+            for i, deposito in enumerate(conta["Depósitos"]):
                 print(
-                    f"R${deposito:.2f} \nHorário do Depósito: {horarios_transacoes[i]}\n"
+                    f"R${deposito:.2f} \nHorário do Depósito: {conta['Horário de Transações'][i]}\n"
                 )
-        if saques:
+        if conta["Saques"]:
             print("\nSeus saques:")
-            for i, saque in enumerate(saques):
+            for i, saque in enumerate(conta["Saques"]):
                 print(
-                    f"R${saque:.2f} \nHorário do Saque: {horarios_transacoes[len(depositos) + i]}\n"
+                    f"R${saque:.2f} \nHorário do Saque: {conta['Horário de Transações'][len(conta['Depósitos']) + i]}\n"
                 )
-        if not depositos:
+        if not conta["Depósitos"]:
             print("\nAinda não foram realizados depósitos")
-        if not saques:
+        if not conta["Saques"]:
             print("\nAinda não foram realizados saques")
-    print(f"\nSaldo atual: R${saldo:.2f}")
+    print(f"\nSaldo atual: R${conta['Saldo']:.2f}")
 
 
 while True:
@@ -205,24 +231,23 @@ while True:
     elif opcao == 2:
         cpf_usuario = input("\nInsira o CPF do usuário dono da conta: ")
         numero_conta = criar_conta_corrente(cpf_usuario, numero_conta)
-    # Saque
-    elif opcao == 3:
-        conta_usuario = input(
-            "\nInsira o número da sua conta: "
-        )  # associar com o usuario
-        valorDeposito = float(input("\nInsira o valor a ser depositado: "))
-        saldo, limite_transacoes, horarios_transacoes = depositar(
-            saldo, limite_transacoes, horarios_transacoes, valorDeposito
-        )
     # Depósito
+    elif opcao == 3:
+        cpf_usuario = input("\nInsira o CPF do usuário dono da conta: ")
+        numero_conta_usuario = input("\nInsira o número da sua conta: ")
+        valor_deposito = float(input("\nInsira o valor a ser depositado: "))
+        depositar(cpf_usuario, numero_conta_usuario, valor_deposito)
+    # Saque
     elif opcao == 4:
-        valorSaque = float(input("\nInsira o valor a ser sacado: "))
-        saldo, limite_transacoes, horarios_transacoes = sacar(
-            saldo, limite_transacoes, horarios_transacoes, valorSaque
-        )
-    # Mostrar o extrato (pegar extrato de todas as contas do usuário)
+        cpf_usuario = input("\nInsira o CPF do usuário dono da conta: ")
+        numero_conta_usuario = input("\nInsira o número da sua conta: ")
+        valor_saque = float(input("\nInsira o valor a ser sacado: "))
+        sacar(cpf_usuario, numero_conta_usuario, valor_saque)
+    # Mostrar o extrato
     elif opcao == 5:
-        extrato(depositos, saques, saldo)
+        cpf_usuario = input("\nInsira o CPF do usuário dono da conta: ")
+        numero_conta_usuario = input("\nInsira o número da sua conta: ")
+        extrato(cpf_usuario, numero_conta_usuario)
     # Sair
     elif opcao == 0:
         print("Operação encerrada! Saindo do programa...")
